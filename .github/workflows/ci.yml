@@ -40,4 +40,13 @@ jobs:
 
       - name: Build Projects
         run: npm run build
+
+      - name: Upload Build Artifcats
+        uses: actions/upload-artifacts@4
+        with:
+          name: next-build
+          path: .next
+      
+      - name: Run ES Lint
+        run:  npm run lint
       
