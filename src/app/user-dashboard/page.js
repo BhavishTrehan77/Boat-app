@@ -11,19 +11,7 @@ export default function UserDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-    if (status === 'unauthenticated') {
-      router.push('/auth')
-      return
-    }
-    if (status === 'authenticated' && session?.user?.id) {
-      fetchUserDashboard()
-    }
-  }, [status, session, router])
-
-  const fetchUserDashboard = async () => {
+const fetchUserDashboard = async () => {
     try {
       const res = await fetch(`/api/dashboard/user/${session.user.id}`)
       if (!res.ok) throw new Error('Failed to fetch user dashboard')
@@ -36,6 +24,18 @@ export default function UserDashboard() {
       setLoading(false)
     }
   }
+  useEffect(() => {
+    setMounted(true)
+    if (status === 'unauthenticated') {
+      router.push('/auth')
+      return
+    }
+    if (status === 'authenticated' && session?.user?.id) {
+      fetchUserDashboard()
+    }
+  }, [status, session, router])
+
+  
 
   if (!mounted || status === 'loading' || loading) {
     return (
