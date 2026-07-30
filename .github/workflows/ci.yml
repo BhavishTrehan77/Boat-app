@@ -33,7 +33,7 @@ jobs:
             exit 1
           fi
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Run ES Lint
         run:  npm run lint
