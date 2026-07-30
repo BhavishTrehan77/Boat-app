@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react'
+export const dynamic = 'force-dynamic';
+
+import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
@@ -11,20 +13,6 @@ export default function UserDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const fetchUserDashboard = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/dashboard/user/${session.user.id}`)
-      if (!res.ok) throw new Error('Failed to fetch user dashboard')
-      const json = await res.json()
-      setData(json.body)
-    } catch (err) {
-      setError(err.message)
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }, [session.user.id])
-
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/auth')
@@ -32,9 +20,22 @@ export default function UserDashboard() {
     }
     if (status === 'authenticated' && session?.user?.id) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      fetchUserDashboard()
+      ;(async () => {
+        setLoading(true)
+        try {
+          const res = await fetch(`/api/dashboard/user/${session.user.id}`)
+          if (!res.ok) throw new Error('Failed to fetch user dashboard')
+          const json = await res.json()
+          setData(json.body)
+        } catch (err) {
+          setError(err.message)
+          console.error(err)
+        } finally {
+          setLoading(false)
+        }
+      })()
     }
-  }, [status, session, router, fetchUserDashboard])
+  }, [status, session, router])
 
   if (status === 'loading' || loading) {
     return (
