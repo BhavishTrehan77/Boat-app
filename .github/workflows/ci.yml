@@ -33,20 +33,27 @@ jobs:
             exit 1
           fi
       - name: Install Dependencies
-        run: npm install
-
-      - name: Run Tests
         run: npm ci
+
+      - name: Run ES Lint
+        run:  npm run lint
+      
+      - name: Run Tests
+        run: npm test
 
       - name: Build Projects
         run: npm run build
-
+      
       - name: Upload Build Artifcats
-        uses: actions/upload-artifact@4
+        uses: actions/upload-artifact@v4
         with:
           name: next-build
           path: .next
+
+   
+
       
-      - name: Run ES Lint
-        run:  npm run lint
+      
+      
+      
       
