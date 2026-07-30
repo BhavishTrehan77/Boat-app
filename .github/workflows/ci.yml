@@ -7,9 +7,13 @@ on:
   pull_request:
     branches:
       - main
+permissions:
+  contents: read
 jobs:
   test:
+    name: Test and build applications
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
@@ -19,6 +23,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
       - name: Check Database DATABASE_URL
         run: |
           if [ -n "$DATABASE_URL" ]; then
@@ -31,7 +36,7 @@ jobs:
         run: npm install
 
       - name: Run Tests
-        run: npm test
+        run: npm ci
 
       - name: Build Projects
         run: npm run build
