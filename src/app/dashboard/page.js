@@ -1,48 +1,30 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 
 export default function Dashboard() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-    fetchDashboard()
-  }, [])
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchDashboard = async () => {
     try {
-      const res = await fetch('/api/dashboard')
-      if (!res.ok) throw new Error('Failed to fetch dashboard')
-      const json = await res.json()
-      setData(json.body)
+      const res = await fetch('/api/dashboard');
+      if (!res.ok) throw new Error('Failed to fetch dashboard');
+      const json = await res.json();
+      setData(json.body);
     } catch (err) {
-      setError(err.message)
-      console.error(err)
+      setError(err.message);
+      console.error(err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  if (!mounted) {
-    return (
-      <main className="dashboard-container">
-        <section className="hero">
-          <div className="hero__content">
-            <p className="hero__eyebrow">📊 Admin Dashboard</p>
-            <h1 className="hero__title">Platform Analytics</h1>
-            <p className="hero__description">Real-time overview of your BOAT warranty platform</p>
-          </div>
-        </section>
-        <div className="loading">
-          <p>Loading dashboard...</p>
-        </div>
-      </main>
-    )
-  }
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchDashboard();
+  }, []);
 
   return (
     <>
@@ -188,5 +170,5 @@ export default function Dashboard() {
         }
       `}</style>
     </>
-  )
+  );
 }

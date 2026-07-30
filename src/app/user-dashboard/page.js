@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
@@ -10,8 +10,8 @@ export default function UserDashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [mounted, setMounted] = useState(false)
-const fetchUserDashboard = async () => {
+
+  const fetchUserDashboard = useCallback(async () => {
     try {
       const res = await fetch(`/api/dashboard/user/${session.user.id}`)
       if (!res.ok) throw new Error('Failed to fetch user dashboard')
@@ -23,21 +23,20 @@ const fetchUserDashboard = async () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [session.user.id])
+
   useEffect(() => {
-    setMounted(true)
     if (status === 'unauthenticated') {
       router.push('/auth')
       return
     }
     if (status === 'authenticated' && session?.user?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchUserDashboard()
     }
-  }, [status, session, router])
+  }, [status, session, router, fetchUserDashboard])
 
-  
-
-  if (!mounted || status === 'loading' || loading) {
+  if (status === 'loading' || loading) {
     return (
       <main className="user-dashboard-container">
         <p style={{ textAlign: 'center', padding: '3rem' }}>Loading...</p>

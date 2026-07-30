@@ -43,6 +43,7 @@ function WarrantyContent() {
 
   useEffect(() => {
     if (params.get("serial")) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       check({ preventDefault() {} });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

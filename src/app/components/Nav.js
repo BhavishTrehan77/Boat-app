@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { useState, useEffect } from "react";
 
 const links = [
   { href: "/", label: "Home" },
@@ -17,34 +16,11 @@ export default function Nav() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleLogout = async () => {
     await signOut({ redirect: false });
     router.push("/");
   };
-
-  if (!mounted) {
-    return (
-      <nav className="app-nav">
-        <Link href="/" className="brand">
-          <span className="brand__mark">⚓</span>
-          <span>BOAT Warranty</span>
-        </Link>
-        <div className="links">
-          {links.map((l) => (
-            <Link key={l.href} href={l.href} className="link">
-              {l.label}
-            </Link>
-          ))}
-        </div>
-      </nav>
-    );
-  }
 
   return (
     <nav className="app-nav">
