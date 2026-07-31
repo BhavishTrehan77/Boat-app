@@ -1,4 +1,4 @@
-name: Node.js Ci
+name: Node.js CI
 
 on:
   push:
@@ -7,106 +7,119 @@ on:
   pull_request:
     branches:
       - main
+
 permissions:
   contents: read
+
 jobs:
   lint:
-    name: Lint 
+    name: Lint Application
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     env:
-      DATABASE_URL: ${{secrets.DATABASE_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
     steps:
-      - name: Checkout into repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Check Database DATABASE_URL
+
+      - name: Check DATABASE_URL
         run: |
           if [ -n "$DATABASE_URL" ]; then
-            echo "DATABASE_URL loaded success"
+            echo "DATABASE_URL loaded successfully"
           else
             echo "DATABASE_URL missing"
             exit 1
           fi
+
       - name: Install Dependencies
         run: npm install
 
       - name: Generate Prisma Client
         run: npx prisma generate
 
-      - name: Run ES Lint
-        run:  npm run lint
-      
-      
+      - name: Run ESLint
+        run: npm run lint
 
-      
-      
-      
   test:
-    name: Run test
+    name: Test Application
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    
     needs: lint
 
     env:
-      DATABASE_URL: ${{secrets.DATABASE_URL}}
-    steps:
-      - name: setup new machine
-        uses: actions/checkout@v4
-      - name: Setup Node 
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - name: check Database DATABASE_URL
-        run: |
-          if [-n "$DATABASE_URL"]: then
-            echo "Database url loaded"
-          else
-            echo "not loaded"
-            exit 1
-          fi
-      - name: Install Dependencies
-        run: npm install
-      - name: prisma Generate
-        run: npx prisma generate
-      - name: Run Tests
-        run: npm  test
-  build: 
-    name: Build application
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-    needs: test
-    
-    env:
-      DATABASE_URL: ${{secrets.DATABASE_URL}}
     steps:
-      - name: checkout to new machine
+      - name: Checkout Repository
         uses: actions/checkout@v4
-      - name: run node js
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Checkout  DATABASE_URL
+
+      - name: Check DATABASE_URL
         run: |
           if [ -n "$DATABASE_URL" ]; then
-            echo "DATABASE_URL loaded success"
+            echo "DATABASE_URL loaded successfully"
           else
-            echo "not fixed"
+            echo "DATABASE_URL missing"
             exit 1
           fi
+
       - name: Install Dependencies
         run: npm install
-      - name: Generate prisma Client
+
+      - name: Generate Prisma Client
         run: npx prisma generate
-      - name: Build Projects
+
+      - name: Run Tests
+        run: npm test
+
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: test
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check DATABASE_URL
+        run: |
+          if [ -n "$DATABASE_URL" ]; then
+            echo "DATABASE_URL loaded successfully"
+          else
+            echo "DATABASE_URL missing"
+            exit 1
+          fi
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build Project
         run: npm run build
 
       - name: Upload Build Artifact
@@ -114,8 +127,3 @@ jobs:
         with:
           name: next-build
           path: .next
-
-
-
-
-
