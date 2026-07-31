@@ -175,11 +175,13 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Build Vercel Project
-        run: |
-          vercel build \
-            --prod \
-            --token=${{ secrets.VERCEL_SECRET  }}
+       - name: Build Vercel Project
+         run: |
+           vercel build \
+             --prod \
+             --token=${{ secrets.VERCEL_SECRET  }}
+         env:
+           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
 
       - name: Deploy to Vercel
         run: |
