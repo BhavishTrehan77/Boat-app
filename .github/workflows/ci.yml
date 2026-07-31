@@ -10,12 +10,12 @@ on:
 permissions:
   contents: read
 jobs:
-  test:
-    name: Test and build applications
+  lint:
+    name: Lint 
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL: ${{secrets.DATABASE_URL }}
     steps:
       - name: Checkout into repository
         uses: actions/checkout@v4
@@ -41,22 +41,81 @@ jobs:
       - name: Run ES Lint
         run:  npm run lint
       
-      - name: Run Tests
-        run: npm test
+      
 
+      
+      
+      
+  test:
+    name: Run test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    needs: lint
+
+    env:
+      DATABASE_URL: ${{secrets.DATABASE_URL}}
+    steps:
+      - name: setup new machine
+        uses: actions/checkout@v4
+      - name: Setup Node 
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: check Database DATABASE_URL
+        run: |
+          if [-n "$DATABASE_URL"]: then
+            echo "Database url loaded"
+          else
+            echo "not loaded"
+            exit 1
+          fi
+      - name: Install Dependencies
+        run: npm install
+      - name: prisma Generate
+        run: npx prisma generate
+      - name: Run Tests
+        run: npm  test
+  build: 
+    name: Build application
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    needs: test
+    
+    env:
+      DATABASE_URL: ${{secrets.DATABASE_URL}}
+    steps:
+      - name: checkout to new machine
+        uses: actions/checkout@v4
+      - name: run node js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Checkout  DATABASE_URL
+        run: |
+          if [ -n "$DATABASE_URL" ]; then
+            echo "DATABASE_URL loaded success"
+          else
+            echo "not fixed"
+            exit 1
+          fi
+      - name: Install Dependencies
+        run: npm install
+      - name: Generate prisma Client
+        run: npx prisma generate
       - name: Build Projects
         run: npm run build
-      
-      - name: Upload Build Artifcats
+
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: next-build
           path: .next
 
-   
 
-      
-      
-      
-      
-      
+
+
+
