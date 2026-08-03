@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Nav from "./components/Nav";
+import Footer from "./components/Footer";
 import { Providers } from "./providers";
 
 const geistSans = Geist({
@@ -14,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "BOAT Warranty Platform",
-  description: "A polished warranty portal for checking coverage, managing products and repairs",
+  title: "BOAT | Official Warranty & Support Portal",
+  description: "Verify your warranty status, manage registered devices, track repairs, and get official support.",
 };
 
 export default function RootLayout({ children }) {
@@ -26,8 +27,11 @@ export default function RootLayout({ children }) {
     >
       <body>
         <Providers>
-          <Nav />
-          {children}
+          <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+            <Nav />
+            <main style={{ flex: 1 }}>{children}</main>
+            <Footer />
+          </div>
         </Providers>
       </body>
     </html>
