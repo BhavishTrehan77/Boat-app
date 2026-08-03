@@ -2,174 +2,142 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function UserDashboard() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/auth')
-      return
+      router.push('/auth');
+      return;
     }
     if (status === 'authenticated' && session?.user?.id) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      ;(async () => {
-        setLoading(true)
+      (async () => {
+        setLoading(true);
         try {
-          const res = await fetch(`/api/dashboard/user/${session.user.id}`)
-          if (!res.ok) throw new Error('Failed to fetch user dashboard')
-          const json = await res.json()
-          setData(json.body)
+          const res = await fetch(`/api/dashboard/user/${session.user.id}`);
+          if (!res.ok) throw new Error('Failed to fetch user dashboard statistics');
+          const json = await res.json();
+          setData(json.body);
         } catch (err) {
-          setError(err.message)
-          console.error(err)
+          setError(err.message);
+          console.error(err);
         } finally {
-          setLoading(false)
+          setLoading(false);
         }
-      })()
+      })();
     }
-  }, [status, session, router])
+  }, [status, session, router]);
 
   if (status === 'loading' || loading) {
     return (
-      <main className="user-dashboard-container">
-        <p style={{ textAlign: 'center', padding: '3rem' }}>Loading...</p>
-      </main>
-    )
+      <div className="container" style={{ textAlign: 'center', padding: '100px 20px' }}>
+        <div className="spinner" style={{ width: '32px', height: '32px', borderThickness: '3px' }} />
+        <p style={{ marginTop: '16px', color: 'var(--text-muted)' }}>Loading your owner dashboard...</p>
+      </div>
+    );
   }
 
   if (!session?.user) {
-    return null
+    return null;
   }
 
   return (
-    <main className="user-dashboard-container">
-      <section className="hero">
-        <div className="hero__content">
-          <p className="hero__eyebrow">👤 My Dashboard</p>
-          <h1 className="hero__title">Welcome, {session.user.name}!</h1>
-          <p className="hero__description">Your warranties and repair requests at a glance</p>
+    <div className="container">
+      <div className="hero">
+        <div className="hero__intro" style={{ alignItems: 'flex-start', textAlign: 'left' }}>
+          <span className="hero__eyebrow">👤 PERSONAL DASHBOARD</span>
+          <h1>Welcome, <span className="highlight">{session.user.name}</span>!</h1>
+          <p>Overview of your registered BOAT hardware, warranty status, and service tickets.</p>
         </div>
-      </section>
+      </div>
 
       {error && (
-        <div className="error">
-          <p>Error: {error}</p>
+        <div className="msg error">
+          <span>⚠️</span>
+          <span>{error}</span>
         </div>
       )}
 
       {data && (
-        <section className="user-dashboard__stats">
-          <div className="stat-card">
-            <div className="stat-icon">📦</div>
-            <div className="stat-content">
-              <h3>My Products</h3>
-              <p className="stat-value">{data.totalProducts}</p>
+        <div className="grid-cards" style={{ marginTop: '20px' }}>
+          <div className="feature-card">
+            <div className="feature-card__icon" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa' }}>📦</div>
+            <div className="feature-card__title">Total Registered Devices</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '36px', fontWeight: 800, color: '#fff' }}>
+              {data.totalProducts ?? 0}
             </div>
+            <div className="feature-card__desc">Devices linked to your owner ID</div>
+            <Link href="/products" className="feature-card__link">Manage Hardware Catalog →</Link>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-icon">✅</div>
-            <div className="stat-content">
-              <h3>Active Warranties</h3>
-              <p className="stat-value">{data.Warrenties}</p>
+          <div className="feature-card">
+            <div className="feature-card__icon" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>✓</div>
+            <div className="feature-card__title">Active Warranties</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '36px', fontWeight: 800, color: '#34d399' }}>
+              {data.Warrenties ?? 0}
             </div>
+            <div className="feature-card__desc">Devices currently covered</div>
+            <Link href="/warranty" className="feature-card__link">Verify Coverage →</Link>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-icon">⏰</div>
-            <div className="stat-content">
-              <h3>Expired Warranties</h3>
-              <p className="stat-value">{data.expired}</p>
+          <div className="feature-card">
+            <div className="feature-card__icon" style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#ff6b81' }}>⌛</div>
+            <div className="feature-card__title">Expired Warranties</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '36px', fontWeight: 800, color: '#ff6b81' }}>
+              {data.expired ?? 0}
             </div>
+            <div className="feature-card__desc">Term lapsed devices</div>
+            <Link href="/warranty" className="feature-card__link">View Details →</Link>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-icon">🔧</div>
-            <div className="stat-content">
-              <h3>Pending Repairs</h3>
-              <p className="stat-value">{data.pendingRepairs}</p>
+          <div className="feature-card">
+            <div className="feature-card__icon" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>🔧</div>
+            <div className="feature-card__title">Pending Service</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '36px', fontWeight: 800, color: '#fbbf24' }}>
+              {data.pendingRepairs ?? 0}
             </div>
+            <div className="feature-card__desc">Active inspection requests</div>
+            <Link href="/repair" className="feature-card__link">Track Service →</Link>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-icon">✓</div>
-            <div className="stat-content">
-              <h3>Completed Repairs</h3>
-              <p className="stat-value">{data.completedRepairs}</p>
+          <div className="feature-card">
+            <div className="feature-card__icon" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>🏁</div>
+            <div className="feature-card__title">Completed Repairs</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '36px', fontWeight: 800, color: '#34d399' }}>
+              {data.completedRepairs ?? 0}
             </div>
+            <div className="feature-card__desc">Resolved repair tickets</div>
+            <Link href="/repair" className="feature-card__link">Repair History →</Link>
           </div>
-        </section>
+        </div>
       )}
 
-      <style jsx>{`
-        .user-dashboard-container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 2rem 1rem;
-        }
-
-        .user-dashboard__stats {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-          gap: 1.5rem;
-          margin-top: 3rem;
-        }
-
-        .stat-card {
-          background: white;
-          border-radius: 12px;
-          padding: 1.5rem;
-          display: flex;
-          align-items: center;
-          gap: 1.5rem;
-          box-shadow: 0 2px 12px rgba(226, 31, 47, 0.1);
-          border-left: 4px solid var(--brand);
-          transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 8px 24px rgba(226, 31, 47, 0.15);
-        }
-
-        .stat-icon {
-          font-size: 2.5rem;
-          min-width: 60px;
-        }
-
-        .stat-content h3 {
-          font-size: 0.9rem;
-          color: #666;
-          margin: 0 0 0.5rem 0;
-          font-weight: 500;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-
-        .stat-value {
-          font-size: 2rem;
-          font-weight: 700;
-          color: var(--brand);
-          margin: 0;
-        }
-
-        .error {
-          background: #ffe0e0;
-          padding: 2rem;
-          border-radius: 8px;
-          color: var(--brand);
-          font-weight: 500;
-          margin-top: 2rem;
-        }
-      `}</style>
-    </main>
-  )
+      {/* Quick Action Shortcuts */}
+      <div className="card" style={{ marginTop: '40px' }}>
+        <h2>Quick Shortcuts</h2>
+        <div className="sub">Common tasks for BOAT owners</div>
+        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '14px' }}>
+          <Link href="/warranty" className="btn">
+            🔍 Check Any Serial
+          </Link>
+          <Link href="/products" className="btn secondary">
+            ➕ Register New Product
+          </Link>
+          <Link href="/repair" className="btn secondary">
+            🛠️ Submit Repair Ticket
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
 }
