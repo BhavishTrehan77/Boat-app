@@ -19,9 +19,8 @@ export default function UserDashboard() {
       router.push('/auth');
       return;
     }
-    if (status === 'authenticated' && session?.user?.id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      (async () => {
+     if (status === 'authenticated' && session?.user?.id) {
+       (async () => {
         setLoading(true);
         try {
           const res = await fetch(`/api/dashboard/user/${session.user.id}`);

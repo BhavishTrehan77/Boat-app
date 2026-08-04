@@ -42,12 +42,13 @@ function WarrantyContent() {
     product.expiryDate &&
     new Date(product.expiryDate) > new Date();
 
-  useEffect(() => {
-    if (params.get("serial")) {
-      check();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+   useEffect(() => {
+     if (params.get("serial")) {
+       // eslint-disable-next-line react-hooks/set-state-in-effect
+       check();
+     }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
 
   return (
     <div className="container">
@@ -160,7 +161,7 @@ function WarrantyContent() {
                       </div>
                       {r.description && (
                         <div className="meta" style={{ color: "var(--text-main)", marginTop: "8px" }}>
-                          "{r.description}"
+                          {r.description}
                         </div>
                       )}
                     </div>
