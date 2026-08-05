@@ -1,33 +1,37 @@
-# Base image
+# 1. Use Node.js version 20 on Alpine Linux
 FROM node:20-alpine
 
-# Set working directory inside container
+# 2. Install openssl (Required by Prisma database client on Alpine)
+RUN apk add --no-cache openssl
+
+# 3. Create and set working directory inside the container
 WORKDIR /app
 
-# Copy package definitions
+# 4. Copy package files and install dependencies
 COPY package*.json ./
-
-# Install dependencies
 RUN npm install
 
-# Copy Prisma schema and generate client
+# 5. Copy Prisma folder and generate Prisma client
 COPY prisma ./prisma/
 RUN npx prisma generate
 
-# Copy project files
+# 6. Copy the rest of project files
 COPY . .
 
-# Build the Next.js application
+# 7. Build the Next.js app
 RUN npm run build
 
-# Expose Next.js server port
-EXPOSE 3000
-
-# Environment variables
+# 8. Environment variables (HOSTNAME="0.0.0.0" allows external connections)
 ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 ENV NODE_ENV=production
 
-# Start Next.js server
+# 9. Open port 3000
+EXPOSE 3000
+
+# 10. Start the Next.js production server
 CMD ["npm", "start"]
+
+
 
 

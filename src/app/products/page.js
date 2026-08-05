@@ -33,6 +33,43 @@ export default function ProductsPage() {
   const [creating, setCreating] = useState(false);
   const [msg, setMsg] = useState(null);
 
+  const [uploadingProductId, setUploadingProductId] = useState(null);
+  const [uploadMsgMap, setUploadMsgMap] = useState({});
+
+  async function uploadPdfForProduct(productId, file) {
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      setUploadMsgMap((prev) => ({
+        ...prev,
+        [productId]: { type: "error", text: "Only PDF files are allowed." },
+      }));
+      return;
+    }
+
+    setUploadingProductId(productId);
+    setUploadMsgMap((prev) => ({ ...prev, [productId]: null }));
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("productId", productId);
+
+      await api.uploadWarrantyPDF(formData);
+      setUploadMsgMap((prev) => ({
+        ...prev,
+        [productId]: { type: "ok", text: "Warranty PDF uploaded to GCS successfully!" },
+      }));
+      load();
+    } catch (err) {
+      setUploadMsgMap((prev) => ({
+        ...prev,
+        [productId]: { type: "error", text: err.message || "Failed to upload document." },
+      }));
+    } finally {
+      setUploadingProductId(null);
+    }
+  }
+
   async function load() {
     setLoading(true);
     try {
@@ -237,6 +274,8 @@ export default function ProductsPage() {
           {products.map((p) => {
             const active =
               p.expiryDate && new Date(p.expiryDate) > new Date();
+            const pMsg = uploadMsgMap[p.id];
+
             return (
               <div className="item" key={p.id}>
                 <div className="top">
@@ -258,7 +297,58 @@ export default function ProductsPage() {
                   <div>Term: <span style={{ color: "#fff" }}>{p.warrantyMonths} months</span></div>
                 </div>
 
-                <div style={{ display: "flex", gap: "10px", marginTop: "12px", borderTop: "1px solid var(--border-subtle)", paddingTop: "12px" }}>
+                {/* Attached Warranty Documents */}
+                {p.documents && p.documents.length > 0 && (
+                  <div style={{ marginTop: "12px", background: "rgba(0,0,0,0.3)", padding: "12px 14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
+                    <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                      📄 Attached Warranty Documents ({p.documents.length})
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {p.documents.map((doc) => (
+                        <div key={doc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
+                          <a href={doc.fileUrl} target="_blank" rel="noreferrer" style={{ color: "#ff3b68", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span>📄</span> {doc.fileName || `Warranty PDF #${doc.id}`}
+                          </a>
+                          <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="btn secondary" style={{ padding: "4px 10px", fontSize: "11.5px" }}>
+                            View PDF ↗
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Direct Document Upload Option */}
+                <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    id={`pdf-file-${p.id}`}
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        uploadPdfForProduct(p.id, e.target.files[0]);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor={`pdf-file-${p.id}`}
+                    className="btn secondary"
+                    style={{ padding: "6px 12px", fontSize: "12.5px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                  >
+                    {uploadingProductId === p.id ? <span className="spinner" /> : "📤 Attach Warranty PDF"}
+                  </label>
+                </div>
+
+                {pMsg && (
+                  <div className={`msg ${pMsg.type}`} style={{ marginTop: "10px", padding: "8px 12px", fontSize: "12.5px" }}>
+                    <span>{pMsg.type === "ok" ? "✓" : "⚠️"}</span>
+                    <span>{pMsg.text}</span>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: "10px", marginTop: "14px", borderTop: "1px solid var(--border-subtle)", paddingTop: "12px" }}>
                   <Link className="btn" href={`/warranty?serial=${encodeURIComponent(p.serialNumber)}`} style={{ padding: "8px 14px", fontSize: "13px" }}>
                     Check Coverage
                   </Link>

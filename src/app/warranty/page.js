@@ -18,10 +18,16 @@ function WarrantyContent() {
   const [error, setError] = useState("");
   const [product, setProduct] = useState(null);
 
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState(null);
+
   async function check(e) {
     if (e && e.preventDefault) e.preventDefault();
     setError("");
     setProduct(null);
+    setUploadMsg(null);
+    setSelectedFile(null);
     if (!serial.trim()) {
       setError("Please enter a serial number to check warranty");
       return;
@@ -34,6 +40,39 @@ function WarrantyContent() {
       setError(err.message || "No product record found for this serial number");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleUpload(e) {
+    e.preventDefault();
+    if (!selectedFile) {
+      setUploadMsg({ type: "error", text: "Please select a PDF file first." });
+      return;
+    }
+    if (selectedFile.type !== "application/pdf") {
+      setUploadMsg({ type: "error", text: "Only PDF files are allowed." });
+      return;
+    }
+    setUploading(true);
+    setUploadMsg(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("productId", product.id);
+
+      await api.uploadWarrantyPDF(formData);
+      setUploadMsg({ type: "ok", text: "Warranty document uploaded successfully to Google Cloud Storage!" });
+      setSelectedFile(null);
+      if (e.target && e.target.reset) e.target.reset();
+
+      // Refresh product details to show newly uploaded document
+      const res = await api.getWarranty(product.serialNumber);
+      if (res && res.data) setProduct(res.data);
+    } catch (err) {
+      setUploadMsg({ type: "error", text: err.message || "Failed to upload PDF." });
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -174,23 +213,85 @@ function WarrantyContent() {
 
             {/* Uploaded Documents */}
             <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-subtle)" }}>
-              <h3 style={{ fontSize: "18px", color: "#fff", marginBottom: "12px", fontFamily: "var(--font-display)", fontWeight: 700 }}>
-                Warranty Documents
-              </h3>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                <h3 style={{ fontSize: "18px", color: "#fff", fontFamily: "var(--font-display)", fontWeight: 700 }}>
+                  Warranty Documents ({product.documents ? product.documents.length : 0})
+                </h3>
+              </div>
+
               {product.documents && product.documents.length > 0 ? (
-                <div className="list">
+                <div className="list" style={{ marginBottom: "20px" }}>
                   {product.documents.map((d) => (
-                    <div className="item" key={d.id}>
-                      <a href={d.pdfUrl} target="_blank" rel="noreferrer" style={{ color: "#ff3b68", fontWeight: 700 }}>
-                        📄 View Invoice / Warranty PDF ({d.id})
+                    <div className="item" key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: "#ff3b68", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span>📄</span> {d.fileName || `Warranty Document #${d.id}`}
+                        </a>
+                        <div className="meta">Uploaded: {fmtDate(d.uploadedAt)}</div>
+                      </div>
+                      <a href={d.fileUrl} target="_blank" rel="noreferrer" className="btn secondary" style={{ padding: "6px 12px", fontSize: "12px" }}>
+                        View / Download ↗
                       </a>
-                      <div className="meta">Uploaded: {fmtDate(d.uploadedAt)}</div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="muted" style={{ fontSize: "14px" }}>No digital documents attached to this serial.</p>
+                <p className="muted" style={{ fontSize: "14px", marginBottom: "16px" }}>No digital documents attached to this unit yet.</p>
               )}
+
+              {/* Upload Form */}
+              <div style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px dashed var(--border-brand)", borderRadius: "var(--radius-md)", padding: "20px" }}>
+                <h4 style={{ fontSize: "15px", color: "#fff", marginBottom: "6px" }}>📤 Upload New Warranty PDF</h4>
+                <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "14px" }}>
+                  Upload proof of purchase or warranty certificate (PDF only) to Google Cloud Storage.
+                </p>
+
+                <form onSubmit={handleUpload}>
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      id="pdf-upload"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setSelectedFile(e.target.files[0]);
+                          setUploadMsg(null);
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="pdf-upload"
+                      className="btn secondary"
+                      style={{ cursor: "pointer", padding: "8px 16px", fontSize: "13px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                    >
+                      📁 {selectedFile ? selectedFile.name : "Choose PDF File"}
+                    </label>
+
+                    <button
+                      type="submit"
+                      className="btn"
+                      disabled={uploading || !selectedFile}
+                      style={{ padding: "8px 18px", fontSize: "13px" }}
+                    >
+                      {uploading ? <span className="spinner" /> : "Upload to Cloud"}
+                    </button>
+                  </div>
+
+                  {selectedFile && (
+                    <div style={{ marginTop: "8px", fontSize: "12px", color: "#ff3b68" }}>
+                      Selected: <strong>{selectedFile.name}</strong> ({(selectedFile.size / 1024).toFixed(1)} KB)
+                    </div>
+                  )}
+
+                  {uploadMsg && (
+                    <div className={`msg ${uploadMsg.type}`} style={{ marginTop: "12px", padding: "10px 14px", fontSize: "13px" }}>
+                      <span>{uploadMsg.type === "ok" ? "✓" : "⚠️"}</span>
+                      <span>{uploadMsg.text}</span>
+                    </div>
+                  )}
+                </form>
+              </div>
             </div>
           </div>
         )}
