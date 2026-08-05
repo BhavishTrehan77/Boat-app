@@ -1,7 +1,11 @@
 import prisma from "../lib/prisma";
 
 export async function GetProducts(){
-    return await prisma.product.findMany()
+    return await prisma.product.findMany({
+        include: {
+            documents: true
+        }
+    })
 }
 export async function CreateProducts(body){
     const existingProduct=await prisma.product.findUnique({where:{serialNumber:body.serialNumber}})
@@ -12,7 +16,12 @@ export async function CreateProducts(body){
     return await prisma.product.create({data:body})
 }
 export async function GetProductsById(id){
-    return await prisma.product.findMany({where:{id:Number(id)}})
+    return await prisma.product.findUnique({
+        where:{id:Number(id)},
+        include: {
+            documents: true
+        }
+    })
 }
 
 export async function PatchProduct(id,data){

@@ -12,6 +12,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.21.0",
     "@prisma/client": "^6.19.3",
     "bcrypt": "^6.0.0",
     "crypto": "^1.0.1",
@@ -33,7 +34,8 @@
     "jest-environment-node": "^30.4.1",
     "jest-mock-extended": "^4.0.1",
     "supertest": "^7.2.2"
-  },  "prisma": {
+  },
+  "prisma": {
     "seed": "node prisma/seed.js"
   }
 }

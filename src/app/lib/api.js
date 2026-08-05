@@ -36,6 +36,15 @@ export const api = {
 
   getWarranty: (serialNumber) =>
     request("GET", `/api/products/serial/${encodeURIComponent(serialNumber)}`),
+  uploadWarrantyPDF: (formData) =>
+    fetch("/api/warranty/upload", {
+      method: "POST",
+      body: formData,
+    }).then(async (res) => {
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Upload failed");
+      return json;
+    }),
 
   getRepairs: () => request("GET", "/api/repair"),
   createRepair: (body) => request("POST", "/api/repair", body),
