@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { api } from "../lib/api";
 
 function fmtDate(value) {
@@ -29,14 +30,29 @@ const commonIssues = [
 
 function RepairContent() {
   const params = useSearchParams();
+  const { data: session } = useSession();
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState(null);
   const [form, setForm] = useState({
     ...empty,
     productId: params.get("productId") || "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState(null);
+
+  async function updateTicketStatus(ticketId, newStatus) {
+    setUpdatingId(ticketId);
+    try {
+      await api.patchRepair(ticketId, { status: newStatus });
+      await load();
+    } catch (err) {
+      alert(err.message || "Failed to update repair status");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
 
   async function load() {
     setLoading(true);
@@ -240,9 +256,31 @@ function RepairContent() {
                     {r.description}
                   </div>
                 )}
+
+                {/* Admin Status Controls */}
+                {session?.user?.role === "ADMIN" && (
+                  <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "11.5px", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>
+                      ⚙️ Update Status:
+                    </span>
+                    {["PENDING", "IN_PROGRESS", "COMPLETED"].map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        className={`btn ${r.status === st ? "" : "secondary"}`}
+                        disabled={updatingId === r.id || r.status === st}
+                        style={{ padding: "4px 10px", fontSize: "11.5px" }}
+                        onClick={() => updateTicketStatus(r.id, st)}
+                      >
+                        {updatingId === r.id ? "…" : st}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
+
         </div>
       </div>
     </div>

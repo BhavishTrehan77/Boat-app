@@ -26,7 +26,6 @@ async function request(method, path, body) {
 
 export const api = {
   register: (body) => request("POST", "/api/register", body),
-  login: (body) => request("POST", "/api/login", body),
 
   getProducts: () => request("GET", "/api/products"),
   createProduct: (body) => request("POST", "/api/products", body),

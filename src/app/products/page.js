@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { api } from "../lib/api";
 
 function fmtDate(value) {
@@ -27,6 +28,7 @@ const presetModels = [
 ];
 
 export default function ProductsPage() {
+  const { data: session, status } = useSession();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(empty);
@@ -104,17 +106,15 @@ export default function ProductsPage() {
       if (!form.productName || !form.serialNumber || !form.purchaseDate) {
         throw new Error("Please fill in all required fields.");
       }
-      const purchase = new Date(form.purchaseDate);
-      const expiry = new Date(purchase);
-      expiry.setMonth(expiry.getMonth() + Number(form.warrantyMonths || 12));
 
       await api.createProduct({
         productName: form.productName,
         serialNumber: form.serialNumber,
-        purchaseDate: purchase.toISOString(),
+        purchaseDate: form.purchaseDate,
         warrantyMonths: Number(form.warrantyMonths),
-        expiryDate: expiry.toISOString(),
-        userId: Number(form.userId || 1),
+        ...(session?.user?.role === "ADMIN" && form.userId
+          ? { userId: Number(form.userId) }
+          : {}),
       });
 
       setMsg({ type: "ok", text: "Product registered successfully!" });
@@ -129,6 +129,7 @@ export default function ProductsPage() {
       setCreating(false);
     }
   }
+
 
   async function remove(id) {
     if (!confirm("Are you sure you want to delete this product record?")) return;
@@ -226,18 +227,20 @@ export default function ProductsPage() {
                 required
               />
             </div>
-            <div className="field">
-              <label>User ID</label>
-              <input
-                className="input"
-                type="number"
-                value={form.userId}
-                onChange={(e) => update("userId", e.target.value)}
-                placeholder="1"
-                required
-              />
-            </div>
+            {session?.user?.role === "ADMIN" && (
+              <div className="field">
+                <label>User ID (Admin Only)</label>
+                <input
+                  className="input"
+                  type="number"
+                  value={form.userId}
+                  onChange={(e) => update("userId", e.target.value)}
+                  placeholder="e.g. 1"
+                />
+              </div>
+            )}
           </div>
+
 
           <button className="btn" type="submit" disabled={creating} style={{ marginTop: "10px" }}>
             {creating ? <span className="spinner" /> : "Register Product"}
@@ -318,28 +321,31 @@ export default function ProductsPage() {
                   </div>
                 )}
 
-                {/* Direct Document Upload Option */}
-                <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    id={`pdf-file-${p.id}`}
-                    style={{ display: "none" }}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        uploadPdfForProduct(p.id, e.target.files[0]);
-                        e.target.value = "";
-                      }
-                    }}
-                  />
-                  <label
-                    htmlFor={`pdf-file-${p.id}`}
-                    className="btn secondary"
-                    style={{ padding: "6px 12px", fontSize: "12.5px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
-                  >
-                    {uploadingProductId === p.id ? <span className="spinner" /> : "📤 Attach Warranty PDF"}
-                  </label>
-                </div>
+                {/* Direct Document Upload Option (Admin Only) */}
+                {session?.user?.role === "ADMIN" && (
+                  <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      id={`pdf-file-${p.id}`}
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          uploadPdfForProduct(p.id, e.target.files[0]);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor={`pdf-file-${p.id}`}
+                      className="btn secondary"
+                      style={{ padding: "6px 12px", fontSize: "12.5px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                    >
+                      {uploadingProductId === p.id ? <span className="spinner" /> : "📤 Attach Warranty PDF"}
+                    </label>
+                  </div>
+                )}
+
 
                 {pMsg && (
                   <div className={`msg ${pMsg.type}`} style={{ marginTop: "10px", padding: "8px 12px", fontSize: "12.5px" }}>

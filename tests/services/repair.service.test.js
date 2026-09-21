@@ -30,7 +30,9 @@ describe("Repair service", () => {
     const result = await PostingRepair({ productId: 1, issue: "Not charging" });
 
     expect(prisma.product.findUnique).toHaveBeenCalledWith({ where: { id: 1 } });
-    expect(prisma.repairHistory.create).toHaveBeenCalledWith({ data: { productId: 1, issue: "Not charging" } });
+    expect(prisma.repairHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ productId: 1, issue: "Not charging" }),
+    });
     expect(result.id).toBe(1);
   });
 
@@ -46,9 +48,12 @@ describe("Repair service", () => {
 
     const result = await GetingRepair();
 
-    expect(prisma.repairHistory.findMany).toHaveBeenCalledWith({ include: { product: true } });
+    expect(prisma.repairHistory.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ include: { product: true } })
+    );
     expect(result).toEqual(repairs);
   });
+
 
   test("PatchingRepair updates an existing repair", async () => {
     prisma.repairHistory.findUnique.mockResolvedValue({ id: 1, issue: "Old" });

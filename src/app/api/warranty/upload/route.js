@@ -1,11 +1,28 @@
 import { UploadWarrantyPDF } from "@/app/services/upload.services";
+import { getAuthSession } from "@/app/lib/session";
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
   try {
+    const session = await getAuthSession();
+    if (!session) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized. Please log in." },
+        { status: 401 }
+      );
+    }
+
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Forbidden. Only administrators can upload warranty documents.",
+        },
+        { status: 403 }
+      );
+    }
+
     const formData = await request.formData();
-    
-    // Get file (supports 'file' or 'pdf' form field names)
     const file = formData.get("file") || formData.get("pdf");
     const productId = formData.get("productId");
 
@@ -44,7 +61,6 @@ export async function POST(request) {
       {
         success: false,
         message: error.message || "Failed to upload warranty document.",
-        error: error.message,
       },
       { status: 400 }
     );

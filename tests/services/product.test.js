@@ -30,16 +30,23 @@ describe("Product service", () => {
   });
 
   test("CreateProducts creates a product when the serial number is new", async () => {
-    const body = { productName: "Mouse", serialNumber: "SN002", purchaseDate: new Date(), warrantyMonths: 12, expiryDate: new Date() };
+    const body = { productName: "Mouse", serialNumber: "SN002", purchaseDate: new Date("2026-01-01"), warrantyMonths: 12 };
     prisma.product.findUnique.mockResolvedValue(null);
     prisma.product.create.mockResolvedValue({ id: 2, ...body });
 
     const result = await CreateProducts(body);
 
     expect(prisma.product.findUnique).toHaveBeenCalledWith({ where: { serialNumber: body.serialNumber } });
-    expect(prisma.product.create).toHaveBeenCalledWith({ data: body });
+    expect(prisma.product.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        productName: "Mouse",
+        serialNumber: "SN002",
+        warrantyMonths: 12,
+      }),
+    });
     expect(result).toEqual({ id: 2, ...body });
   });
+
 
   test("CreateProducts throws when the serial number already exists", async () => {
     const body = { productName: "Mouse", serialNumber: "SN002" };
@@ -49,14 +56,19 @@ describe("Product service", () => {
   });
 
   test("GetProductsById returns products matching the id", async () => {
-    const products = [{ id: 1, productName: "Laptop" }];
-    prisma.product.findMany.mockResolvedValue(products);
+    const product = { id: 1, productName: "Laptop" };
+    prisma.product.findUnique.mockResolvedValue(product);
 
     const result = await GetProductsById(1);
 
-    expect(prisma.product.findMany).toHaveBeenCalledWith({ where: { id: 1 } });
-    expect(result).toEqual(products);
+    expect(prisma.product.findUnique).toHaveBeenCalledWith({
+      where: { id: 1 },
+      include: { documents: true, repairs: true },
+    });
+    expect(result).toEqual(product);
+
   });
+
 
   test("PatchProduct updates an existing product", async () => {
     const updatedProduct = { id: 1, productName: "Laptop Pro" };

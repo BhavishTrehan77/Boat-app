@@ -64,5 +64,8 @@ export const authOptions = {
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || process.env.ACC_KEY,
-};
+  secret:
+    process.env.NEXTAUTH_SECRET ||
+    process.env.ACC_KEY ||
+    "boat-support-super-secret-jwt-key-2026",
+};

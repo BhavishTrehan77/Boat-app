@@ -5,12 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 
-const links = [
+const navLinks = [
   { href: "/", label: "Home" },
   { href: "/warranty", label: "Warranty Check" },
   { href: "/products", label: "Products Hub" },
   { href: "/repair", label: "Service Center" },
-  { href: "/dashboard", label: "Admin Analytics" },
 ];
 
 export default function Nav() {
@@ -23,6 +22,13 @@ export default function Nav() {
     await signOut({ redirect: false });
     router.push("/");
   };
+
+  const links = [
+    ...navLinks,
+    ...(session?.user?.role === "ADMIN"
+      ? [{ href: "/dashboard", label: "Admin Analytics" }]
+      : []),
+  ];
 
   return (
     <nav className="app-nav">
@@ -66,6 +72,7 @@ export default function Nav() {
           </Link>
         )}
       </div>
+
 
       <div className="nav-end">
         {status === "loading" ? (

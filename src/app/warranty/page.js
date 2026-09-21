@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { api } from "../lib/api";
 
@@ -12,6 +13,7 @@ function fmtDate(value) {
 }
 
 function WarrantyContent() {
+  const { data: session } = useSession();
   const params = useSearchParams();
   const [serial, setSerial] = useState(params.get("serial") || "");
   const [loading, setLoading] = useState(false);
@@ -239,59 +241,62 @@ function WarrantyContent() {
                 <p className="muted" style={{ fontSize: "14px", marginBottom: "16px" }}>No digital documents attached to this unit yet.</p>
               )}
 
-              {/* Upload Form */}
-              <div style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px dashed var(--border-brand)", borderRadius: "var(--radius-md)", padding: "20px" }}>
-                <h4 style={{ fontSize: "15px", color: "#fff", marginBottom: "6px" }}>📤 Upload New Warranty PDF</h4>
-                <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "14px" }}>
-                  Upload proof of purchase or warranty certificate (PDF only) to Google Cloud Storage.
-                </p>
+              {/* Upload Form (Admin Only) */}
+              {session?.user?.role === "ADMIN" && (
+                <div style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px dashed var(--border-brand)", borderRadius: "var(--radius-md)", padding: "20px" }}>
+                  <h4 style={{ fontSize: "15px", color: "#fff", marginBottom: "6px" }}>📤 Upload New Warranty PDF</h4>
+                  <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "14px" }}>
+                    Upload proof of purchase or warranty certificate (PDF only) to Google Cloud Storage.
+                  </p>
 
-                <form onSubmit={handleUpload}>
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      id="pdf-upload"
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          setSelectedFile(e.target.files[0]);
-                          setUploadMsg(null);
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor="pdf-upload"
-                      className="btn secondary"
-                      style={{ cursor: "pointer", padding: "8px 16px", fontSize: "13px", display: "inline-flex", alignItems: "center", gap: "6px" }}
-                    >
-                      📁 {selectedFile ? selectedFile.name : "Choose PDF File"}
-                    </label>
+                  <form onSubmit={handleUpload}>
+                    <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        id="pdf-upload"
+                        style={{ display: "none" }}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            setSelectedFile(e.target.files[0]);
+                            setUploadMsg(null);
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor="pdf-upload"
+                        className="btn secondary"
+                        style={{ cursor: "pointer", padding: "8px 16px", fontSize: "13px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                      >
+                        📁 {selectedFile ? selectedFile.name : "Choose PDF File"}
+                      </label>
 
-                    <button
-                      type="submit"
-                      className="btn"
-                      disabled={uploading || !selectedFile}
-                      style={{ padding: "8px 18px", fontSize: "13px" }}
-                    >
-                      {uploading ? <span className="spinner" /> : "Upload to Cloud"}
-                    </button>
-                  </div>
-
-                  {selectedFile && (
-                    <div style={{ marginTop: "8px", fontSize: "12px", color: "#ff3b68" }}>
-                      Selected: <strong>{selectedFile.name}</strong> ({(selectedFile.size / 1024).toFixed(1)} KB)
+                      <button
+                        type="submit"
+                        className="btn"
+                        disabled={uploading || !selectedFile}
+                        style={{ padding: "8px 18px", fontSize: "13px" }}
+                      >
+                        {uploading ? <span className="spinner" /> : "Upload to Cloud"}
+                      </button>
                     </div>
-                  )}
 
-                  {uploadMsg && (
-                    <div className={`msg ${uploadMsg.type}`} style={{ marginTop: "12px", padding: "10px 14px", fontSize: "13px" }}>
-                      <span>{uploadMsg.type === "ok" ? "✓" : "⚠️"}</span>
-                      <span>{uploadMsg.text}</span>
-                    </div>
-                  )}
-                </form>
-              </div>
+                    {selectedFile && (
+                      <div style={{ marginTop: "8px", fontSize: "12px", color: "#ff3b68" }}>
+                        Selected: <strong>{selectedFile.name}</strong> ({(selectedFile.size / 1024).toFixed(1)} KB)
+                      </div>
+                    )}
+
+                    {uploadMsg && (
+                      <div className={`msg ${uploadMsg.type}`} style={{ marginTop: "12px", padding: "10px 14px", fontSize: "13px" }}>
+                        <span>{uploadMsg.type === "ok" ? "✓" : "⚠️"}</span>
+                        <span>{uploadMsg.text}</span>
+                      </div>
+                    )}
+                  </form>
+                </div>
+              )}
+
             </div>
           </div>
         )}

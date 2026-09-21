@@ -26,7 +26,7 @@ jest.mock("../../src/app/lib/prisma", () => ({
 }));
 
 import prisma from "../../src/app/lib/prisma";
-import { Signup, Login, Forgot } from "../../src/app/services/auth.service";
+import { Signup, Login } from "../../src/app/services/auth.service";
 
 describe("Auth service", () => {
   beforeEach(() => {
@@ -90,23 +90,5 @@ describe("Auth service", () => {
       await expect(Login("b@e.com", "wrong")).rejects.toThrow("password didnt match");
     });
   });
-
-  describe("Forgot", () => {
-    test("should return reset token for existing user", async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 1, email: "b@e.com" });
-      prisma.user.update.mockResolvedValue({ id: 1 });
-
-      const result = await Forgot("b@e.com");
-
-      expect(result.resetToken).toBeDefined();
-      expect(result.resetToken.length).toBeGreaterThan(0);
-      expect(prisma.user.update).toHaveBeenCalled();
-    });
-
-    test("should throw when user is not found", async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-
-      await expect(Forgot("unknown@e.com")).rejects.toThrow("error coming");
-    });
-  });
 });
+

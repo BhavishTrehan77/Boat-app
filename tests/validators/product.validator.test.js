@@ -4,7 +4,7 @@ describe("Product validator", () => {
   test("accepts valid product payload", () => {
     const result = Productvalidation.safeParse({
       productName: "BOAT Airdopes 141",
-      searialNumber: "BOAT-12345",
+      serialNumber: "BOAT-12345",
       purchaseDate: "2026-01-01",
       warrantyMonths: 12,
       userId: 1,
@@ -15,7 +15,7 @@ describe("Product validator", () => {
   test("rejects short productName", () => {
     const result = Productvalidation.safeParse({
       productName: "A",
-      searialNumber: "BOAT-12345",
+      serialNumber: "BOAT-12345",
       purchaseDate: "2026-01-01",
       warrantyMonths: 12,
       userId: 1,
@@ -23,10 +23,10 @@ describe("Product validator", () => {
     expect(result.success).toBe(false);
   });
 
-  test("rejects short searialNumber", () => {
+  test("rejects short serialNumber", () => {
     const result = Productvalidation.safeParse({
       productName: "BOAT Airdopes",
-      searialNumber: "A1",
+      serialNumber: "A1",
       purchaseDate: "2026-01-01",
       warrantyMonths: 12,
       userId: 1,
@@ -37,7 +37,7 @@ describe("Product validator", () => {
   test("rejects zero or negative warrantyMonths", () => {
     const result = Productvalidation.safeParse({
       productName: "BOAT Airdopes",
-      searialNumber: "BOAT-12345",
+      serialNumber: "BOAT-12345",
       purchaseDate: "2026-01-01",
       warrantyMonths: 0,
       userId: 1,
@@ -48,7 +48,7 @@ describe("Product validator", () => {
   test("rejects negative userId", () => {
     const result = Productvalidation.safeParse({
       productName: "BOAT Airdopes",
-      searialNumber: "BOAT-12345",
+      serialNumber: "BOAT-12345",
       purchaseDate: "2026-01-01",
       warrantyMonths: 12,
       userId: -1,
