@@ -2,9 +2,9 @@ import { GetAdminDashboard } from "@/app/services/dashboard.services";
 import { getAuthSession } from "@/app/lib/session";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request) {
   try {
-    const session = await getAuthSession();
+    const session = await getAuthSession(request);
     if (!session) {
       return NextResponse.json(
         { success: false, message: "Unauthorized. Please log in." },

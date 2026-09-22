@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { api } from "../lib/api";
 
@@ -30,8 +30,10 @@ const commonIssues = [
 
 function RepairContent() {
   const params = useSearchParams();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [repairs, setRepairs] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   const [form, setForm] = useState({
@@ -41,11 +43,29 @@ function RepairContent() {
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState(null);
 
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    } else if (status === "authenticated" && session?.user?.role !== "ADMIN") {
+      router.push("/login");
+    }
+  }, [status, session, router]);
+
+  async function removeRepair(id) {
+    if (!confirm("Are you sure you want to delete this repair record?")) return;
+    try {
+      await api.deleteRepair(id);
+      load();
+    } catch (err) {
+      alert(err.message || "Failed to delete repair");
+    }
+  }
+
   async function updateTicketStatus(ticketId, newStatus) {
     setUpdatingId(ticketId);
     try {
       await api.patchRepair(ticketId, { status: newStatus });
-      await load();
+      load();
     } catch (err) {
       alert(err.message || "Failed to update repair status");
     } finally {
@@ -57,8 +77,12 @@ function RepairContent() {
   async function load() {
     setLoading(true);
     try {
-      const res = await api.getRepairs();
-      setRepairs(res.data || []);
+      const [repairsRes, productsRes] = await Promise.all([
+        api.getRepairs(),
+        api.getProducts(),
+      ]);
+      setRepairs(repairsRes.data || repairsRes.body || []);
+      setProducts(productsRes.body || productsRes.data || []);
     } catch (err) {
       setMsg({ type: "error", text: err.message });
     } finally {
@@ -110,29 +134,34 @@ function RepairContent() {
     <div className="container">
       <div className="hero">
         <div className="hero__intro">
-          <span className="hero__eyebrow">🛠 SERVICE & REPAIR CENTER</span>
-          <h1>Submit & Track BOAT Service Tickets</h1>
-          <p>File official service requests, log hardware issues, and monitor repair status in real time.</p>
+          <span className="hero__eyebrow">🛠 REPAIR MANAGEMENT · ADMIN</span>
+          <h1>BOAT Repair Records</h1>
+          <p>Log service requests, inspect repair history, and update resolution statuses in real time.</p>
         </div>
       </div>
 
-      {/* New Service Form */}
+      {/* Add New Repair Record Form */}
       <div className="card">
-        <h2>Raise New Service Ticket</h2>
-        <div className="sub">Requires a registered Product ID</div>
+        <h2>Add Repair Record</h2>
+        <div className="sub">Link a repair ticket to a product by ID</div>
 
         <form onSubmit={submit}>
           <div className="row">
             <div className="field">
-              <label>Target Product ID</label>
-              <input
+              <label>Select Target Product</label>
+              <select
                 className="input"
-                type="number"
                 value={form.productId}
                 onChange={(e) => update("productId", e.target.value)}
-                placeholder="e.g. 1"
                 required
-              />
+              >
+                <option value="">-- Choose Product --</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.productName} ({p.serialNumber})
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="field">
@@ -257,11 +286,11 @@ function RepairContent() {
                   </div>
                 )}
 
-                {/* Admin Status Controls */}
-                {session?.user?.role === "ADMIN" && (
+                {/* Status Controls for Admin vs Visual Tracker for Regular User */}
+                {session?.user?.role === "ADMIN" ? (
                   <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <span style={{ fontSize: "11.5px", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>
-                      ⚙️ Update Status:
+                      ⚙️ Admin Status Control:
                     </span>
                     {["PENDING", "IN_PROGRESS", "COMPLETED"].map((st) => (
                       <button
@@ -275,6 +304,48 @@ function RepairContent() {
                         {updatingId === r.id ? "…" : st}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      style={{ padding: "4px 10px", fontSize: "11.5px", marginLeft: "auto", color: "#ff6b81" }}
+                      onClick={() => removeRepair(r.id)}
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-subtle)" }}>
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: 600 }}>
+                      📍 Repair Progress Tracker:
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                      {[
+                        { key: "PENDING", label: "1. Request Received", icon: "🟡" },
+                        { key: "IN_PROGRESS", label: "2. Under Inspection / Repair", icon: "🔵" },
+                        { key: "COMPLETED", label: "3. Service Completed", icon: "🟢" },
+                      ].map((step) => {
+                        const isCurrent = (r.status || "PENDING") === step.key;
+                        const isDone =
+                          r.status === "COMPLETED" ||
+                          (r.status === "IN_PROGRESS" && step.key === "PENDING");
+                        return (
+                          <span
+                            key={step.key}
+                            style={{
+                              fontSize: "12px",
+                              padding: "4px 10px",
+                              borderRadius: "6px",
+                              background: isCurrent ? "rgba(255, 59, 104, 0.15)" : isDone ? "rgba(16, 185, 129, 0.15)" : "rgba(255,255,255,0.05)",
+                              color: isCurrent ? "#ff3b68" : isDone ? "#34d399" : "var(--text-muted)",
+                              border: isCurrent ? "1px solid #ff3b68" : isDone ? "1px solid #34d399" : "1px solid transparent",
+                              fontWeight: isCurrent ? 700 : 500,
+                            }}
+                          >
+                            {step.icon} {step.label}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

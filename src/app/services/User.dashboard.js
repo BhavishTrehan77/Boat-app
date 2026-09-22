@@ -1,30 +1,44 @@
-import prisma from "../lib/prisma"
+import prisma from "../lib/prisma";
 
-export async function GetUserDashboard(userId){
-   const product = await prisma.product.findMany({
+export async function GetUserDashboard(userId) {
+  const products = await prisma.product.findMany({
     where: {
-        userId: Number(userId)
+      userId: Number(userId),
     },
     include: {
-        repairs: true
-    }
-});
-   const totalProducts=product.length
+      repairs: true,
+    },
+  });
 
-   const Warrenties=product.filter(p=>new Date(p.expiryDate)>new Date()).length
-   const expired=product.filter(p=>new Date(p.expiryDate)<=new Date()).length
+  const totalProducts = products.length;
+  const now = new Date();
 
-   const pendingRepairs=product.reduce((total,product)=>{
-      return total+product.repairs.filter(repair=>repair.status==="PENDING").length
-   },0)
-   const completedRepairs=product.reduce((total,product)=>{
-      return total+product.repairs.filter(repair=>repair.status==="COMPLETED").length
-   },0)
-   return {
-      totalProducts,
-      Warrenties,
-      expired,
-      pendingRepairs,
-      completedRepairs
-   }
+  const Warrenties = products.filter(
+    (p) => p.expiryDate && new Date(p.expiryDate) > now
+  ).length;
+  const expired = products.filter(
+    (p) => p.expiryDate && new Date(p.expiryDate) <= now
+  ).length;
+
+  const pendingRepairs = products.reduce((total, p) => {
+    return (
+      total +
+      (p.repairs || []).filter((repair) => repair.status === "PENDING").length
+    );
+  }, 0);
+
+  const completedRepairs = products.reduce((total, p) => {
+    return (
+      total +
+      (p.repairs || []).filter((repair) => repair.status === "COMPLETED").length
+    );
+  }, 0);
+
+  return {
+    totalProducts,
+    Warrenties,
+    expired,
+    pendingRepairs,
+    completedRepairs,
+  };
 }

@@ -2,10 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { api } from '../lib/api';
 
 export default function Dashboard() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [data, setData] = useState(null);
+  const [repairs, setRepairs] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [updatingId, setUpdatingId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [repairsLoading, setRepairsLoading] = useState(true);
+  const [docsLoading, setDocsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const fetchDashboard = async () => {
@@ -24,10 +34,57 @@ export default function Dashboard() {
     }
   };
 
+  const fetchRepairs = async () => {
+    setRepairsLoading(true);
+    try {
+      const res = await api.getRepairs();
+      setRepairs(res.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRepairsLoading(false);
+    }
+  };
+
+  const fetchDocuments = async () => {
+    setDocsLoading(true);
+    try {
+      const res = await api.getWarrantyDocuments();
+      setDocuments(res.body || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDocsLoading(false);
+    }
+  };
+
+  const updateTicketStatus = async (ticketId, newStatus) => {
+    setUpdatingId(ticketId);
+    try {
+      await api.patchRepair(ticketId, { status: newStatus });
+      await Promise.all([fetchDashboard(), fetchRepairs()]);
+    } catch (err) {
+      alert(err.message || 'Failed to update repair status');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchDashboard();
-  }, []);
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+    if (status === 'authenticated') {
+      if (session?.user?.role !== 'ADMIN') {
+        router.push('/login');
+        return;
+      }
+      fetchDashboard();
+      fetchRepairs();
+      fetchDocuments();
+    }
+  }, [status, session, router]);
 
   return (
     <div className="container">
@@ -77,8 +134,7 @@ export default function Dashboard() {
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 800, color: '#fff' }}>
               {data.totalProducts ?? 0}
             </div>
-            <div className="feature-card__desc">Total serials registered</div>
-            <Link href="/products" className="feature-card__link">View Products →</Link>
+            <div className="feature-card__desc">Total serials registered across platform</div>
           </div>
 
           <div className="feature-card">
@@ -87,8 +143,7 @@ export default function Dashboard() {
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 800, color: '#34d399' }}>
               {data.activeWarranty ?? 0}
             </div>
-            <div className="feature-card__desc">Valid coverage active</div>
-            <Link href="/warranty" className="feature-card__link">Warranty Lookup →</Link>
+            <div className="feature-card__desc">Devices currently under valid coverage</div>
           </div>
 
           <div className="feature-card">
@@ -150,6 +205,145 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Service & Repair Ticket Management Queue */}
+      <div className="card" style={{ marginTop: '40px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <h2>🛠️ Service & Repair Ticket Management</h2>
+            <div className="sub" style={{ marginBottom: 0 }}>
+              Track all customer repair tickets and update progress (Pending, In Progress, Completed)
+            </div>
+          </div>
+          <button className="btn secondary" onClick={fetchRepairs} style={{ padding: '8px 14px', fontSize: '13px' }}>
+            🔄 Refresh Queue
+          </button>
+        </div>
+
+        {repairsLoading && (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)' }}>
+            <div className="spinner" style={{ margin: '0 auto 8px' }} />
+            Loading repair queue...
+          </div>
+        )}
+
+        {!repairsLoading && repairs.length === 0 && (
+          <p className="muted" style={{ padding: '20px 0' }}>No active repair tickets found in the system.</p>
+        )}
+
+        <div className="list">
+          {repairs.map((r) => {
+            const statusKey = (r.status || "PENDING").toLowerCase();
+            return (
+              <div className="item" key={r.id}>
+                <div className="top">
+                  <div>
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "4px" }}>
+                      Ticket <span style={{ color: "#ff3b68", fontFamily: "monospace", fontWeight: "700" }}>#{r.id}</span> · Linked Product: <span style={{ color: "#fff", fontWeight: 600 }}>{r.product?.productName || `Product #${r.productId}`}</span> ({r.product?.serialNumber || 'No SN'})
+                    </div>
+                    <h3 style={{ fontSize: "18px" }}>{r.issue}</h3>
+                  </div>
+                  <span className={`tag ${statusKey}`}>
+                    {r.status || "PENDING"}
+                  </span>
+                </div>
+
+                <div className="meta" style={{ marginTop: "10px", display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                  <div>Filed Date: <span style={{ color: "#fff" }}>{r.repairDate ? new Date(r.repairDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</span></div>
+                  <div>Estimated Cost: <span style={{ color: "#fff" }}>${r.cost || 0}</span></div>
+                  {r.product?.userId && <div>Owner Account: <span style={{ color: "#fff" }}>User #{r.product.userId}</span></div>}
+                </div>
+
+                {r.description && (
+                  <div style={{ marginTop: "10px", background: "rgba(0,0,0,0.3)", padding: "10px 14px", borderRadius: "8px", fontSize: "13.5px", color: "var(--text-main)", borderLeft: "3px solid var(--brand)" }}>
+                    {r.description}
+                  </div>
+                )}
+
+                {/* Admin Status Controls */}
+                <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 700 }}>
+                    ⚡ Update Status:
+                  </span>
+                  {[
+                    { key: "PENDING", label: "Pending" },
+                    { key: "IN_PROGRESS", label: "In Progress" },
+                    { key: "COMPLETED", label: "Completed" },
+                  ].map(({ key, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`btn ${r.status === key ? "" : "secondary"}`}
+                      disabled={updatingId === r.id || r.status === key}
+                      style={{ padding: "5px 12px", fontSize: "12px" }}
+                      onClick={() => updateTicketStatus(r.id, key)}
+                    >
+                      {updatingId === r.id ? "…" : label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Customer Warranty Documents & Downloads (Admin Feature) */}
+      <div className="card" style={{ marginTop: '40px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <h2>📄 Customer Warranty Documents & Uploads</h2>
+            <div className="sub" style={{ marginBottom: 0 }}>
+              Download customer-uploaded warranty cards, invoices, receipts, and hardware photos
+            </div>
+          </div>
+          <button className="btn secondary" onClick={fetchDocuments} style={{ padding: '8px 14px', fontSize: '13px' }}>
+            🔄 Refresh Documents
+          </button>
+        </div>
+
+        {docsLoading && (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)' }}>
+            <div className="spinner" style={{ margin: '0 auto 8px' }} />
+            Loading warranty documents...
+          </div>
+        )}
+
+        {!docsLoading && documents.length === 0 && (
+          <p className="muted" style={{ padding: '20px 0' }}>No customer warranty documents or images uploaded yet.</p>
+        )}
+
+        <div className="list">
+          {documents.map((doc) => {
+            const isImg = /\.(png|jpe?g|webp|gif)$/i.test(doc.fileName || doc.fileUrl);
+            return (
+              <div className="item" key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '26px' }}>{isImg ? '🖼️' : '📄'}</span>
+                  <div>
+                    <h3 style={{ fontSize: '16px' }}>{doc.fileName || `Document #${doc.id}`}</h3>
+                    <div className="meta" style={{ marginTop: '2px' }}>
+                      Product: <strong style={{ color: '#fff' }}>{doc.product?.productName || `Product #${doc.productId}`}</strong>
+                      {doc.product?.serialNumber && ` (${doc.product.serialNumber})`}
+                      {doc.product?.user && ` · Owner: ${doc.product.user.name || doc.product.user.email}`}
+                      {` · Uploaded: ${new Date(doc.uploadedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="btn secondary" style={{ padding: '6px 12px', fontSize: '12.5px' }}>
+                    View ↗
+                  </a>
+                  <a href={`/api/warranty/download/${doc.id}`} className="btn" style={{ padding: '6px 14px', fontSize: '12.5px' }}>
+                    ⬇️ Download {isImg ? 'Image' : 'PDF'}
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

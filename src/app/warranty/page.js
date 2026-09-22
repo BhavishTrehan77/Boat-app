@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { api } from "../lib/api";
@@ -14,6 +14,7 @@ function fmtDate(value) {
 
 function WarrantyContent() {
   const { data: session } = useSession();
+  const router = useRouter();
   const params = useSearchParams();
   const [serial, setSerial] = useState(params.get("serial") || "");
   const [loading, setLoading] = useState(false);
@@ -48,11 +49,12 @@ function WarrantyContent() {
   async function handleUpload(e) {
     e.preventDefault();
     if (!selectedFile) {
-      setUploadMsg({ type: "error", text: "Please select a PDF file first." });
+      setUploadMsg({ type: "error", text: "Please select an image or PDF file first." });
       return;
     }
-    if (selectedFile.type !== "application/pdf") {
-      setUploadMsg({ type: "error", text: "Only PDF files are allowed." });
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg", "application/pdf"];
+    if (!allowedTypes.includes(selectedFile.type)) {
+      setUploadMsg({ type: "error", text: "Only images (JPG, PNG, WEBP) and PDF files are allowed." });
       return;
     }
     setUploading(true);
@@ -63,8 +65,8 @@ function WarrantyContent() {
       formData.append("file", selectedFile);
       formData.append("productId", product.id);
 
-      await api.uploadWarrantyPDF(formData);
-      setUploadMsg({ type: "ok", text: "Warranty document uploaded successfully to Google Cloud Storage!" });
+      await api.uploadWarrantyFile(formData);
+      setUploadMsg({ type: "ok", text: "File uploaded successfully via Multer!" });
       setSelectedFile(null);
       if (e.target && e.target.reset) e.target.reset();
 
@@ -72,16 +74,18 @@ function WarrantyContent() {
       const res = await api.getWarranty(product.serialNumber);
       if (res && res.data) setProduct(res.data);
     } catch (err) {
-      setUploadMsg({ type: "error", text: err.message || "Failed to upload PDF." });
+      setUploadMsg({ type: "error", text: err.message || "Failed to upload file." });
     } finally {
       setUploading(false);
     }
   }
 
-  const active =
-    product &&
-    product.expiryDate &&
-    new Date(product.expiryDate) > new Date();
+  const now = new Date();
+  const expiry = product?.expiryDate ? new Date(product.expiryDate) : null;
+  const isExpired = expiry && expiry < now;
+  const daysRemaining = expiry ? Math.ceil((expiry - now) / (1000 * 60 * 60 * 24)) : 0;
+  const isExpiringSoon = !isExpired && daysRemaining <= 30;
+  const active = !isExpired;
 
    useEffect(() => {
      if (params.get("serial")) {
@@ -149,9 +153,19 @@ function WarrantyContent() {
                 <span style={{ fontSize: "12px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700 }}>Verified Product</span>
                 <h2 style={{ fontSize: "24px", color: "#fff" }}>{product.productName}</h2>
               </div>
-              <span className={`tag ${active ? "ok" : "expired"}`} style={{ fontSize: "13px", padding: "6px 14px" }}>
-                {active ? "✓ WARRANTY ACTIVE" : "✕ WARRANTY EXPIRED"}
-              </span>
+              {isExpired ? (
+                <span className="tag expired" style={{ fontSize: "13px", padding: "6px 14px" }}>
+                  ✕ WARRANTY EXPIRED
+                </span>
+              ) : isExpiringSoon ? (
+                <span className="tag pending" style={{ fontSize: "13px", padding: "6px 14px", background: "rgba(245, 158, 11, 0.2)", color: "#fbbf24", border: "1px solid #fbbf24" }}>
+                  ⚠️ EXPIRING SOON ({daysRemaining}d left)
+                </span>
+              ) : (
+                <span className="tag ok" style={{ fontSize: "13px", padding: "6px 14px" }}>
+                  ✓ WARRANTY ACTIVE
+                </span>
+              )}
             </div>
 
             <dl className="dl" style={{ marginTop: "20px" }}>
@@ -166,10 +180,15 @@ function WarrantyContent() {
             </dl>
 
             {/* Actions Bar */}
-            <div style={{ marginTop: "24px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              <Link className="btn" href={`/repair?productId=${product.id || ""}`}>
-                🛠 Request Service / Repair
+            <div style={{ marginTop: "24px", display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+              <Link className="btn" href={`/product/${encodeURIComponent(product.serialNumber)}`}>
+                🔗 Dedicated Product Details Page →
               </Link>
+              {session?.user?.role === "ADMIN" && (
+                <Link className="btn secondary" href="/admin/repairs">
+                  🛠 Manage Service Tickets
+                </Link>
+              )}
               <button
                 className="btn secondary"
                 type="button"
@@ -223,37 +242,56 @@ function WarrantyContent() {
 
               {product.documents && product.documents.length > 0 ? (
                 <div className="list" style={{ marginBottom: "20px" }}>
-                  {product.documents.map((d) => (
-                    <div className="item" key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: "#ff3b68", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span>📄</span> {d.fileName || `Warranty Document #${d.id}`}
-                        </a>
-                        <div className="meta">Uploaded: {fmtDate(d.uploadedAt)}</div>
+                  {product.documents.map((d) => {
+                    const isImg = /\.(png|jpe?g|webp|gif)$/i.test(d.fileName || d.fileUrl);
+                    return (
+                      <div className="item" key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <span style={{ fontSize: "24px" }}>{isImg ? "🖼️" : "📄"}</span>
+                          <div>
+                            <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: "#ff3b68", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+                              {d.fileName || `Document #${d.id}`}
+                            </a>
+                            <div className="meta">
+                              Type: {isImg ? "Image File" : "PDF Document"} · Uploaded: {fmtDate(d.uploadedAt)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <a href={d.fileUrl} target="_blank" rel="noreferrer" className="btn secondary" style={{ padding: "6px 12px", fontSize: "12px" }}>
+                            View ↗
+                          </a>
+                          <a
+                            href={`/api/warranty/download/${d.id}`}
+                            className="btn"
+                            style={{ padding: "6px 12px", fontSize: "12px" }}
+                            title="Download file to computer"
+                          >
+                            ⬇️ Download
+                          </a>
+                        </div>
                       </div>
-                      <a href={d.fileUrl} target="_blank" rel="noreferrer" className="btn secondary" style={{ padding: "6px 12px", fontSize: "12px" }}>
-                        View / Download ↗
-                      </a>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="muted" style={{ fontSize: "14px", marginBottom: "16px" }}>No digital documents attached to this unit yet.</p>
+                <p className="muted" style={{ fontSize: "14px", marginBottom: "16px" }}>No digital documents or images attached to this unit yet.</p>
               )}
 
-              {/* Upload Form (Admin Only) */}
+              {/* Upload Form (Available for logged-in Administrator) */}
               {session?.user?.role === "ADMIN" && (
                 <div style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px dashed var(--border-brand)", borderRadius: "var(--radius-md)", padding: "20px" }}>
-                  <h4 style={{ fontSize: "15px", color: "#fff", marginBottom: "6px" }}>📤 Upload New Warranty PDF</h4>
+                  <h4 style={{ fontSize: "15px", color: "#fff", marginBottom: "6px" }}>📸 Upload Product Image or Warranty Document (Admin)</h4>
                   <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "14px" }}>
-                    Upload proof of purchase or warranty certificate (PDF only) to Google Cloud Storage.
+                    Attach proof of purchase, warranty receipt, or hardware photo (PNG, JPG, WEBP, or PDF) via Multer.
                   </p>
 
                   <form onSubmit={handleUpload}>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
                       <input
                         type="file"
-                        accept="application/pdf"
+                        accept="image/*,application/pdf"
                         id="pdf-upload"
                         style={{ display: "none" }}
                         onChange={(e) => {
@@ -268,7 +306,7 @@ function WarrantyContent() {
                         className="btn secondary"
                         style={{ cursor: "pointer", padding: "8px 16px", fontSize: "13px", display: "inline-flex", alignItems: "center", gap: "6px" }}
                       >
-                        📁 {selectedFile ? selectedFile.name : "Choose PDF File"}
+                        📁 {selectedFile ? selectedFile.name : "Choose Image or PDF"}
                       </label>
 
                       <button
@@ -277,7 +315,7 @@ function WarrantyContent() {
                         disabled={uploading || !selectedFile}
                         style={{ padding: "8px 18px", fontSize: "13px" }}
                       >
-                        {uploading ? <span className="spinner" /> : "Upload to Cloud"}
+                        {uploading ? <span className="spinner" /> : "Upload File (Multer)"}
                       </button>
                     </div>
 

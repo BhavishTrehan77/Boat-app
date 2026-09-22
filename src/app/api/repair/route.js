@@ -51,7 +51,11 @@ export async function POST(request) {
       );
     }
 
-    const data = await createRepair(validate.data);
+    const payload = {
+      ...validate.data,
+      status: session.user.role === "ADMIN" && validate.data.status ? validate.data.status : "PENDING",
+    };
+    const data = await createRepair(payload);
     return NextResponse.json(
       {
         success: true,

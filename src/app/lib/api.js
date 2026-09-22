@@ -35,7 +35,9 @@ export const api = {
 
   getWarranty: (serialNumber) =>
     request("GET", `/api/products/serial/${encodeURIComponent(serialNumber)}`),
-  uploadWarrantyPDF: (formData) =>
+
+  // Upload image or PDF document using Multer
+  uploadWarrantyFile: (formData) =>
     fetch("/api/warranty/upload", {
       method: "POST",
       body: formData,
@@ -44,6 +46,15 @@ export const api = {
       if (!res.ok) throw new Error(json.message || "Upload failed");
       return json;
     }),
+
+  // Keep uploadWarrantyPDF alias for backwards compatibility
+  uploadWarrantyPDF: (formData) => api.uploadWarrantyFile(formData),
+
+  // Fetch warranty documents list
+  getWarrantyDocuments: () => request("GET", "/api/warranty/documents"),
+
+  // Download URL generator
+  getDownloadUrl: (id) => `/api/warranty/download/${id}`,
 
   getRepairs: () => request("GET", "/api/repair"),
   createRepair: (body) => request("POST", "/api/repair", body),

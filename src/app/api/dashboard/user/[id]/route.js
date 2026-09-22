@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 export async function GET(request, { params }) {
   try {
-    const session = await getAuthSession();
+    const session = await getAuthSession(request);
     if (!session) {
       return NextResponse.json(
         { success: false, message: "Unauthorized. Please log in." },

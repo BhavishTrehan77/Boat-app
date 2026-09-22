@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { api } from "../lib/api";
 
@@ -12,6 +12,7 @@ export default function AuthPage() {
     name: "",
     email: "",
     password: "",
+    role: "USER",
   });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -36,13 +37,27 @@ export default function AuthPage() {
           throw new Error("Invalid email or password. Please try again.");
         }
 
-        setMsg({
-          type: "ok",
-          text: "Authentication successful! Redirecting to your dashboard…",
-        });
-        setTimeout(() => {
-          router.push("/user-dashboard");
-        }, 800);
+        // Check role after login to redirect to proper dashboard
+        const session = await getSession();
+        const role = session?.user?.role || "USER";
+
+        if (role === "ADMIN") {
+          setMsg({
+            type: "ok",
+            text: "Welcome Admin! Redirecting to Admin Management Console…",
+          });
+          setTimeout(() => {
+            router.push("/admin");
+          }, 600);
+        } else {
+          setMsg({
+            type: "ok",
+            text: "Authentication successful! Redirecting to products hub…",
+          });
+          setTimeout(() => {
+            router.push("/products");
+          }, 600);
+        }
       } else {
         if (!form.name || !form.email || !form.password) {
           throw new Error("Please complete all registration fields.");
@@ -51,10 +66,11 @@ export default function AuthPage() {
           name: form.name,
           email: form.email,
           password: form.password,
+          role: form.role || "USER",
         });
         setMsg({
           type: "ok",
-          text: "Registration successful! You can now sign in with your credentials.",
+          text: `Registration successful as ${form.role || "USER"}! You can now sign in with your credentials.`,
         });
         setTab("login");
       }
@@ -98,17 +114,32 @@ export default function AuthPage() {
 
         <form onSubmit={submit}>
           {tab === "register" && (
-            <div className="field">
-              <label htmlFor="name">Full Name</label>
-              <input
-                id="name"
-                className="input"
-                value={form.name}
-                onChange={(e) => update("name", e.target.value)}
-                placeholder="e.g. Alex Morgan"
-                required
-              />
-            </div>
+            <>
+              <div className="field">
+                <label htmlFor="name">Full Name</label>
+                <input
+                  id="name"
+                  className="input"
+                  value={form.name}
+                  onChange={(e) => update("name", e.target.value)}
+                  placeholder="e.g. Alex Morgan"
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="role">Register As</label>
+                <select
+                  id="role"
+                  className="input"
+                  value={form.role}
+                  onChange={(e) => update("role", e.target.value)}
+                >
+                  <option value="USER">Customer / Device Owner (USER)</option>
+                  <option value="ADMIN">Support Administrator (ADMIN)</option>
+                </select>
+              </div>
+            </>
           )}
 
           <div className="field">

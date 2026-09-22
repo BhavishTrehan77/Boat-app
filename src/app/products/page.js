@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { api } from "../lib/api";
 
@@ -29,21 +30,48 @@ const presetModels = [
 
 export default function ProductsPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(empty);
   const [creating, setCreating] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
   const [msg, setMsg] = useState(null);
+
+  async function updateProductSubmit(e) {
+    e.preventDefault();
+    if (!editingProduct) return;
+    try {
+      await api.patchProduct(editingProduct.id, {
+        productName: editingProduct.productName,
+        warrantyMonths: Number(editingProduct.warrantyMonths),
+      });
+      setEditingProduct(null);
+      setMsg({ type: "ok", text: "Product details updated successfully!" });
+      load();
+    } catch (err) {
+      alert(err.message || "Failed to update product");
+    }
+  }
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    } else if (status === "authenticated" && session?.user?.role !== "ADMIN") {
+      router.push("/login");
+    }
+  }, [status, session, router]);
 
   const [uploadingProductId, setUploadingProductId] = useState(null);
   const [uploadMsgMap, setUploadMsgMap] = useState({});
 
-  async function uploadPdfForProduct(productId, file) {
+  async function uploadFileForProduct(productId, file) {
     if (!file) return;
-    if (file.type !== "application/pdf") {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/jpg", "application/pdf"];
+    if (!allowed.includes(file.type)) {
       setUploadMsgMap((prev) => ({
         ...prev,
-        [productId]: { type: "error", text: "Only PDF files are allowed." },
+        [productId]: { type: "error", text: "Only images (JPG, PNG, WEBP) and PDF files are allowed." },
       }));
       return;
     }
@@ -56,10 +84,10 @@ export default function ProductsPage() {
       formData.append("file", file);
       formData.append("productId", productId);
 
-      await api.uploadWarrantyPDF(formData);
+      await api.uploadWarrantyFile(formData);
       setUploadMsgMap((prev) => ({
         ...prev,
-        [productId]: { type: "ok", text: "Warranty PDF uploaded to GCS successfully!" },
+        [productId]: { type: "ok", text: "File uploaded successfully via Multer!" },
       }));
       load();
     } catch (err) {
@@ -76,7 +104,7 @@ export default function ProductsPage() {
     setLoading(true);
     try {
       const res = await api.getProducts();
-      setProducts(res.body || []);
+      setProducts(res.body || res.data || []);
     } catch (err) {
       setMsg({ type: "error", text: err.message });
     } finally {
@@ -300,48 +328,64 @@ export default function ProductsPage() {
                   <div>Term: <span style={{ color: "#fff" }}>{p.warrantyMonths} months</span></div>
                 </div>
 
-                {/* Attached Warranty Documents */}
+                {/* Attached Warranty Documents & Images */}
                 {p.documents && p.documents.length > 0 && (
                   <div style={{ marginTop: "12px", background: "rgba(0,0,0,0.3)", padding: "12px 14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
                     <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                      📄 Attached Warranty Documents ({p.documents.length})
+                      📁 Attached Warranty Documents & Photos ({p.documents.length})
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                      {p.documents.map((doc) => (
-                        <div key={doc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
-                          <a href={doc.fileUrl} target="_blank" rel="noreferrer" style={{ color: "#ff3b68", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span>📄</span> {doc.fileName || `Warranty PDF #${doc.id}`}
-                          </a>
-                          <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="btn secondary" style={{ padding: "4px 10px", fontSize: "11.5px" }}>
-                            View PDF ↗
-                          </a>
-                        </div>
-                      ))}
+                      {p.documents.map((doc) => {
+                        const isImg = /\.(png|jpe?g|webp|gif)$/i.test(doc.fileName || doc.fileUrl);
+                        return (
+                          <div key={doc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", flexWrap: "wrap", gap: "8px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span>{isImg ? "🖼️" : "📄"}</span>
+                              <a href={doc.fileUrl} target="_blank" rel="noreferrer" style={{ color: "#ff3b68", fontWeight: 600 }}>
+                                {doc.fileName || `Document #${doc.id}`}
+                              </a>
+                            </div>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="btn secondary" style={{ padding: "4px 8px", fontSize: "11px" }}>
+                                View ↗
+                              </a>
+                              <a
+                                href={`/api/warranty/download/${doc.id}`}
+                                className="btn"
+                                style={{ padding: "4px 8px", fontSize: "11px" }}
+                                title="Download file"
+                              >
+                                ⬇️ Download
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
-                {/* Direct Document Upload Option (Admin Only) */}
-                {session?.user?.role === "ADMIN" && (
+                {/* Direct Document/Image Upload Option (Available to User & Admin) */}
+                {session?.user && (
                   <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                     <input
                       type="file"
-                      accept="application/pdf"
-                      id={`pdf-file-${p.id}`}
+                      accept="image/*,application/pdf"
+                      id={`file-${p.id}`}
                       style={{ display: "none" }}
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
-                          uploadPdfForProduct(p.id, e.target.files[0]);
+                          uploadFileForProduct(p.id, e.target.files[0]);
                           e.target.value = "";
                         }
                       }}
                     />
                     <label
-                      htmlFor={`pdf-file-${p.id}`}
+                      htmlFor={`file-${p.id}`}
                       className="btn secondary"
-                      style={{ padding: "6px 12px", fontSize: "12.5px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                      style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
                     >
-                      {uploadingProductId === p.id ? <span className="spinner" /> : "📤 Attach Warranty PDF"}
+                      {uploadingProductId === p.id ? <span className="spinner" /> : "📸 Attach Image / PDF (Multer)"}
                     </label>
                   </div>
                 )}
@@ -354,10 +398,49 @@ export default function ProductsPage() {
                   </div>
                 )}
 
-                <div style={{ display: "flex", gap: "10px", marginTop: "14px", borderTop: "1px solid var(--border-subtle)", paddingTop: "12px" }}>
-                  <Link className="btn" href={`/warranty?serial=${encodeURIComponent(p.serialNumber)}`} style={{ padding: "8px 14px", fontSize: "13px" }}>
-                    Check Coverage
-                  </Link>
+                {/* Inline Product Edit Form */}
+                {editingProduct?.id === p.id && (
+                  <form onSubmit={updateProductSubmit} style={{ marginTop: "14px", padding: "12px", background: "rgba(255,255,255,0.04)", borderRadius: "8px", border: "1px dashed var(--border-brand)" }}>
+                    <h4 style={{ fontSize: "13px", color: "#fff", marginBottom: "8px" }}>✏️ Edit Product Details</h4>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
+                      <div>
+                        <label style={{ fontSize: "11px", color: "var(--text-muted)" }}>Product Name</label>
+                        <input
+                          className="input"
+                          value={editingProduct.productName}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, productName: e.target.value })}
+                          required
+                          style={{ padding: "6px 10px", fontSize: "12.5px" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "11px", color: "var(--text-muted)" }}>Warranty (Months)</label>
+                        <input
+                          className="input"
+                          type="number"
+                          value={editingProduct.warrantyMonths}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, warrantyMonths: e.target.value })}
+                          required
+                          style={{ padding: "6px 10px", fontSize: "12.5px" }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                      <button type="submit" className="btn" style={{ padding: "6px 14px", fontSize: "12px" }}>Save</button>
+                      <button type="button" className="btn secondary" onClick={() => setEditingProduct(null)} style={{ padding: "6px 14px", fontSize: "12px" }}>Cancel</button>
+                    </div>
+                  </form>
+                )}
+
+                <div style={{ display: "flex", gap: "10px", marginTop: "14px", borderTop: "1px solid var(--border-subtle)", paddingTop: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                  <button
+                    className="btn secondary"
+                    type="button"
+                    onClick={() => setEditingProduct({ id: p.id, productName: p.productName, warrantyMonths: p.warrantyMonths })}
+                    style={{ padding: "8px 14px", fontSize: "13px" }}
+                  >
+                    ✏️ Edit
+                  </button>
                   <Link className="btn secondary" href={`/repair?productId=${p.id}`} style={{ padding: "8px 14px", fontSize: "13px" }}>
                     File Repair
                   </Link>
@@ -367,7 +450,7 @@ export default function ProductsPage() {
                     onClick={() => remove(p.id)}
                     style={{ padding: "8px 14px", fontSize: "13px", marginLeft: "auto", color: "#ff6b81" }}
                   >
-                    Delete
+                    🗑️ Delete
                   </button>
                 </div>
               </div>

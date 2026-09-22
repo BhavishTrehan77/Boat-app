@@ -43,12 +43,13 @@ Client Request
 
 ### 5. Warranty Documents & Storage Module
 - **Public Lookup**: `GET /api/products/serial/[serialNumber]` queries product, linked documents, and repair history by serial number without requiring login.
-- **Admin Upload Route**: `POST /api/warranty/upload` is guarded by Admin RBAC.
+- **Upload Route**: `POST /api/warranty/upload` allows authenticated Users (for their products) and Admins (for any product).
+- **Download Route**: `GET /api/warranty/download/[id]` allows Admins and product owners to download warranty documents and images.
 - **Validation & Size Limits**:
-  - Requires `application/pdf` MIME type.
-  - Enforces 5MB maximum file size limit (`file.size <= 5 * 1024 * 1024`).
+  - Supports image formats (`image/jpeg`, `image/png`, `image/webp`) and PDF (`application/pdf`).
+  - Enforces 5MB maximum file size limit.
   - Verifies that target `productId` exists in the database.
-- **Storage Strategy**: Uploads to Google Cloud Storage (`@google-cloud/storage`) when bucket and GCP credentials are configured, with automatic fallback to local storage (`public/uploads/`).
+- **Storage Strategy**: Local storage using `multer.diskStorage` writing files to `./public/uploads/`.
 
 ### 6. Dashboard Analytics Module
 - **Platform Console**: `GET /api/dashboard` requires `session.user.role === 'ADMIN'`. Aggregates platform-wide metrics (`totalUsers`, `totalProducts`, `activeWarranty`, `expiredWarranty`, `pendingRepairs`, `completedRepairs`).
