@@ -138,6 +138,8 @@ export async function PATCH(request, { params }) {
   }
 }
 
+export const PUT = PATCH;
+
 export async function DELETE(request, { params }) {
   try {
     const session = await getAuthSession(request);
